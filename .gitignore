@@ -1,0 +1,40 @@
+# Credenciales y configuraciones privadas
+.env
+.env.*
+!.env.example
+config/database.php
+config/database.local.php
+config/secrets.php
+*.pem
+*.key
+*.p12
+
+# Bases de datos y copias
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.bak
+*.backup
+
+# Archivos temporales
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Dependencias y caché
+vendor/
+node_modules/
+.cache/
+
+# Configuración de editores
+.vscode/
+.idea/
+
+# Archivos locales de XAMPP
+xampp/
