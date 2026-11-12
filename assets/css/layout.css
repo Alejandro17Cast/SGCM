@@ -1,0 +1,310 @@
+/* =====================================
+   SGCM - ESTRUCTURA GENERAL
+===================================== */
+
+:root {
+    --green: #0C4137;
+    --emerald: #06D6A0;
+    --polar: #E6FBF6;
+    --deep-green: #031D19;
+
+    --sidebar-width: 260px;
+
+    --bg-main: #F5F8F6;
+    --bg-card: #FFFFFF;
+    --text-main: #183A32;
+    --text-muted: #7A8C85;
+    --border: #E5EEEA;
+    --sidebar-bg: #FFFFFF;
+}
+
+html[data-theme="dark"] {
+    --bg-main: #071F1B;
+    --bg-card: #0D2A24;
+    --text-main: #E6FBF6;
+    --text-muted: #9CB3AA;
+    --border: #23443B;
+    --sidebar-bg: #031D19;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+/* =====================================
+   LAYOUT
+===================================== */
+
+.app-layout {
+    min-height: 100vh;
+}
+
+.app-sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 18px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    z-index: 100;
+}
+
+.app-main {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    padding: 35px 42px;
+}
+
+/* =====================================
+   BRAND
+===================================== */
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 12px 35px;
+    color: var(--green);
+    text-decoration: none;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 31px;
+    font-weight: 700;
+}
+
+html[data-theme="dark"] .sidebar-brand {
+    color: var(--emerald);
+}
+
+.brand-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--polar);
+    color: var(--green);
+    font-size: 22px;
+}
+
+/* =====================================
+   SIDEBAR NAVIGATION
+===================================== */
+
+.sidebar-label {
+    padding: 15px 12px 10px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 45px;
+    padding: 11px 13px;
+    border-radius: 9px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: .2s ease;
+}
+
+.nav-icon {
+    width: 22px;
+    text-align: center;
+    font-size: 17px;
+}
+
+.nav-link:hover {
+    background: var(--polar);
+    color: var(--green);
+}
+
+.nav-link.active {
+    background: var(--green);
+    color: white;
+}
+
+.nav-link.disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+.nav-badge {
+    margin-left: auto;
+    font-size: 9px;
+}
+
+/* =====================================
+   SIDEBAR FOOTER
+===================================== */
+
+.sidebar-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: auto;
+    padding: 20px 12px 5px;
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.sidebar-version {
+    color: var(--green);
+    font-weight: 700;
+}
+
+/* =====================================
+   TOPBAR
+===================================== */
+
+.app-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.topbar-eyebrow {
+    color: var(--emerald);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.topbar-welcome h1 {
+    margin: 7px 0;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 37px;
+    font-weight: 600;
+}
+
+.topbar-welcome > p:last-child {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.theme-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.user-avatar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--green);
+    color: white;
+    font-weight: 700;
+}
+
+.logout-button {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 12px;
+}
+
+.logout-button:hover {
+    color: #C34D4D;
+}
+
+/* =====================================
+   RESPONSIVE
+===================================== */
+
+@media (max-width: 900px) {
+
+    :root {
+        --sidebar-width: 210px;
+    }
+
+    .app-main {
+        padding: 28px 24px;
+    }
+
+}
+
+@media (max-width: 650px) {
+
+    .app-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 15px;
+    }
+
+    .sidebar-brand {
+        padding-bottom: 15px;
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .sidebar-label,
+    .sidebar-bottom {
+        display: none;
+    }
+
+    .nav-link {
+        flex: 1;
+    }
+
+    .app-main {
+        margin-left: 0;
+        padding: 22px 16px;
+    }
+
+    .app-topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .topbar-actions {
+        flex-wrap: wrap;
+    }
+
+}
