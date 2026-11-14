@@ -1,5 +1,7 @@
 <?php
+
 $nombreUsuario = $_SESSION['usuario']['nombre'] ?? 'Usuario';
+
 $apellidoUsuario = $_SESSION['usuario']['apellido'] ?? '';
 
 $nombreCompleto = htmlspecialchars(
@@ -8,16 +10,30 @@ $nombreCompleto = htmlspecialchars(
     'UTF-8'
 );
 
-$inicial = strtoupper(substr($nombreUsuario, 0, 1));
+$inicial = strtoupper(
+    substr($nombreUsuario, 0, 1)
+);
+
 ?>
 
 <header class="app-topbar">
 
     <div class="topbar-welcome">
-        <p class="topbar-eyebrow">SISTEMA DE GESTIÓN MÉDICA</p>
-        <h1><?= $nombreCompleto ?></h1>
-        <p>Bienvenido de nuevo a SGCM.</p>
+
+        <p class="topbar-eyebrow">
+            SISTEMA DE GESTIÓN MÉDICA
+        </p>
+
+        <h1>
+            <?= $nombreCompleto ?>
+        </h1>
+
+        <p>
+            Bienvenido de nuevo a SGCM.
+        </p>
+
     </div>
+
 
     <div class="topbar-actions">
 
@@ -25,18 +41,33 @@ $inicial = strtoupper(substr($nombreUsuario, 0, 1));
             class="theme-button"
             id="themeToggle"
             type="button"
-            aria-label="Cambiar tema"
-        >
+            aria-label="Cambiar tema">
+
             <span id="themeIcon">☾</span>
-            <span id="themeText">Modo oscuro</span>
+
+            <span id="themeText">
+                Modo oscuro
+            </span>
+
         </button>
 
+
         <div class="user-avatar">
-            <?= htmlspecialchars($inicial, ENT_QUOTES, 'UTF-8') ?>
+
+            <?= htmlspecialchars(
+                $inicial,
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>
+
         </div>
 
-        <a href="/SGCM/auth/logout.php" class="logout-button">
+
+        <a href="/SGCM/auth/logout.php"
+           class="logout-button">
+
             Cerrar sesión
+
         </a>
 
     </div>
