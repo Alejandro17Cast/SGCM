@@ -1,6 +1,10 @@
 <?php
 session_start();
 
+// =============================================
+// PROTECCIÓN DE ACCESO
+// =============================================
+
 if (!isset($_SESSION['usuario'])) {
     header('Location: ../../index.php');
     exit;
@@ -11,7 +15,15 @@ if ($_SESSION['usuario']['rol'] !== 'administrador') {
     exit;
 }
 
+// =============================================
+// CONEXIÓN A LA BASE DE DATOS
+// =============================================
+
 require_once __DIR__ . '/../../config/database.php';
+
+// =============================================
+// VALIDAR ID
+// =============================================
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
@@ -20,9 +32,16 @@ if (!$id || $id <= 0) {
     exit;
 }
 
-// Buscar paciente
-$stmt = $pdo->prepare("SELECT * FROM pacientes WHERE id = :id LIMIT 1");
+// =============================================
+// CONSULTAR PACIENTE
+// =============================================
+
+$stmt = $pdo->prepare(
+    "SELECT * FROM pacientes WHERE id = :id LIMIT 1"
+);
+
 $stmt->execute(['id' => $id]);
+
 $paciente = $stmt->fetch();
 
 if (!$paciente) {
@@ -30,9 +49,10 @@ if (!$paciente) {
     exit;
 }
 
-$errores = [];
+// =============================================
+// DATOS ORIGINALES
+// =============================================
 
-// Recuperar datos originales
 $datos = [
     'nombres' => $paciente['nombres'],
     'apellidos' => $paciente['apellidos'],
@@ -47,13 +67,22 @@ $datos = [
     'estado' => $paciente['estado']
 ];
 
+$errores = [];
+
+// =============================================
+// PROCESAR FORMULARIO
+// =============================================
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     foreach ($datos as $campo => $valor) {
         $datos[$campo] = trim($_POST[$campo] ?? '');
     }
 
-    // Validar campos obligatorios
+    // =========================================
+    // VALIDAR CAMPOS OBLIGATORIOS
+    // =========================================
+
     $obligatorios = [
         'nombres',
         'apellidos',
@@ -65,20 +94,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     foreach ($obligatorios as $campo) {
+
         if ($datos[$campo] === '') {
             $errores[] = "El campo $campo es obligatorio.";
         }
+
     }
 
-    // Validar correo
+    // =========================================
+    // VALIDAR CORREO
+    // =========================================
+
     if (
         $datos['correo'] !== '' &&
         !filter_var($datos['correo'], FILTER_VALIDATE_EMAIL)
     ) {
+
         $errores[] = 'El correo electrónico no tiene un formato válido.';
+
     }
 
-    // Validar sexo
+    // =========================================
+    // VALIDAR SEXO
+    // =========================================
+
     $sexosPermitidos = [
         'masculino',
         'femenino',
@@ -87,29 +126,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if (!in_array($datos['sexo'], $sexosPermitidos, true)) {
+
         $errores[] = 'Selecciona una opción de sexo válida.';
+
     }
 
-    // Validar estado
+    // =========================================
+    // VALIDAR ESTADO
+    // =========================================
+
     if (!in_array($datos['estado'], ['activo', 'inactivo'], true)) {
+
         $errores[] = 'El estado seleccionado no es válido.';
+
     }
 
-    // Validar fecha
-    $fecha = DateTime::createFromFormat('Y-m-d', $datos['fecha_nacimiento']);
+    // =========================================
+    // VALIDAR FECHA
+    // =========================================
+
+    $fecha = DateTime::createFromFormat(
+        'Y-m-d',
+        $datos['fecha_nacimiento']
+    );
 
     if (
         !$fecha ||
         $fecha->format('Y-m-d') !== $datos['fecha_nacimiento'] ||
         $fecha > new DateTime('today')
     ) {
+
         $errores[] = 'La fecha de nacimiento no es válida.';
+
     }
 
-    // Actualizar paciente
+    // =========================================
+    // ACTUALIZAR PACIENTE
+    // =========================================
+
     if (empty($errores)) {
+
         try {
+
             $sql = "UPDATE pacientes SET
+
                 nombres = :nombres,
                 apellidos = :apellidos,
                 identificacion = :identificacion,
@@ -121,232 +181,444 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 contacto_emergencia = :contacto_emergencia,
                 telefono_emergencia = :telefono_emergencia,
                 estado = :estado
+
                 WHERE id = :id";
 
             $stmt = $pdo->prepare($sql);
 
             $stmt->execute([
+
                 'nombres' => $datos['nombres'],
+
                 'apellidos' => $datos['apellidos'],
+
                 'identificacion' => $datos['identificacion'],
+
                 'fecha_nacimiento' => $datos['fecha_nacimiento'],
+
                 'sexo' => $datos['sexo'],
+
                 'telefono' => $datos['telefono'],
+
                 'correo' => $datos['correo'] ?: null,
+
                 'direccion' => $datos['direccion'],
+
                 'contacto_emergencia' => $datos['contacto_emergencia'] ?: null,
+
                 'telefono_emergencia' => $datos['telefono_emergencia'] ?: null,
+
                 'estado' => $datos['estado'],
+
                 'id' => $id
+
             ]);
 
             header('Location: ver.php?id=' . $id . '&actualizado=1');
             exit;
 
         } catch (PDOException $e) {
+
             if ($e->getCode() === '23000') {
+
                 $errores[] = 'La identificación o el correo ya pertenecen a otro paciente.';
+
             } else {
+
                 error_log($e->getMessage());
+
                 $errores[] = 'Ocurrió un error al actualizar el paciente.';
+
             }
+
         }
+
     }
+
 }
+
+// =============================================
+// FUNCIÓN PARA ESCAPAR HTML
+// =============================================
 
 function e($valor) {
-    return htmlspecialchars((string) ($valor ?? ''), ENT_QUOTES, 'UTF-8');
+
+    return htmlspecialchars(
+        (string) ($valor ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
 }
+
+// =============================================
+// CONFIGURACIÓN DE LA PÁGINA
+// =============================================
+
+$tituloPagina = 'Editar paciente';
+$paginaActiva = 'pacientes';
+
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
+<?php require_once __DIR__ . '/../../includes/header.php'; ?>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?php require_once __DIR__ . '/../../includes/sidebar.php'; ?>
 
-    <title>Editar paciente | SGCM</title>
+<main class="app-main">
 
-    <link rel="stylesheet" href="../../assets/css/styles.css">
-    <link rel="stylesheet" href="assets/pacientes.css">
-</head>
+    <?php require_once __DIR__ . '/../../includes/topbar.php'; ?>
 
-<body>
+    <div class="patients-page">
 
-<div class="patients-page">
+        <!-- =====================================
+             ENCABEZADO
+        ====================================== -->
 
-    <header class="patients-header">
-        <div>
-            <a href="ver.php?id=<?= $id ?>" class="back-link">
-                ← Volver al expediente
-            </a>
+        <header class="patients-header">
 
-            <p class="eyebrow">GESTIÓN DE PACIENTES</p>
+            <div>
 
-            <h1>Editar paciente</h1>
+                <a
+                    href="ver.php?id=<?= (int) $id ?>"
+                    class="back-link"
+                >
+                    ← Volver al expediente
+                </a>
 
-            <p class="subtitle">
-                Modifica la información del paciente seleccionado.
-            </p>
-        </div>
-    </header>
+                <span class="eyebrow">
+                    GESTIÓN DE PACIENTES
+                </span>
 
-    <?php if (!empty($errores)): ?>
-        <div class="form-errors">
-            <strong>No se pudo actualizar el registro:</strong>
+                <h1>Editar paciente</h1>
 
-            <ul>
-                <?php foreach ($errores as $error): ?>
-                    <li><?= e($error) ?></li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
+                <p class="subtitle">
+                    Actualiza los datos personales, de contacto y
+                    de emergencia del paciente.
+                </p>
 
-    <form method="POST" class="patient-form">
+            </div>
 
-        <section class="form-section">
+        </header>
 
-            <h2>01. Información personal</h2>
-            <p>Datos generales de identificación del paciente.</p>
+        <!-- =====================================
+             ERRORES
+        ====================================== -->
 
-            <div class="form-grid">
+        <?php if (!empty($errores)): ?>
 
-                <div class="form-group">
-                    <label>Nombres *</label>
-                    <input type="text" name="nombres"
-                        value="<?= e($datos['nombres']) ?>" required>
-                </div>
+            <div class="form-errors" role="alert">
 
-                <div class="form-group">
-                    <label>Apellidos *</label>
-                    <input type="text" name="apellidos"
-                        value="<?= e($datos['apellidos']) ?>" required>
-                </div>
+                <strong>
+                    No se pudo actualizar el registro:
+                </strong>
 
-                <div class="form-group">
-                    <label>Identificación *</label>
-                    <input type="text" name="identificacion"
-                        value="<?= e($datos['identificacion']) ?>" required>
-                </div>
+                <ul>
 
-                <div class="form-group">
-                    <label>Fecha de nacimiento *</label>
-                    <input type="date" name="fecha_nacimiento"
-                        value="<?= e($datos['fecha_nacimiento']) ?>"
-                        max="<?= date('Y-m-d') ?>" required>
-                </div>
+                    <?php foreach ($errores as $error): ?>
 
-                <div class="form-group">
-                    <label>Sexo *</label>
+                        <li>
+                            <?= e($error) ?>
+                        </li>
 
-                    <select name="sexo" required>
-                        <option value="">Seleccionar</option>
+                    <?php endforeach; ?>
 
-                        <?php foreach ([
-                            'masculino' => 'Masculino',
-                            'femenino' => 'Femenino',
-                            'otro' => 'Otro',
-                            'prefiero_no_decir' => 'Prefiero no decir'
-                        ] as $valor => $etiqueta): ?>
+                </ul>
 
-                            <option value="<?= e($valor) ?>"
-                                <?= $datos['sexo'] === $valor ? 'selected' : '' ?>>
-                                <?= e($etiqueta) ?>
+            </div>
+
+        <?php endif; ?>
+
+        <!-- =====================================
+             FORMULARIO
+        ====================================== -->
+
+        <form method="POST" class="patient-form">
+
+            <!-- INFORMACIÓN PERSONAL -->
+
+            <section class="form-section">
+
+                <h2>01. Información personal</h2>
+
+                <p>
+                    Datos generales de identificación del paciente.
+                </p>
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label for="nombres">
+                            Nombres *
+                        </label>
+
+                        <input
+                            type="text"
+                            id="nombres"
+                            name="nombres"
+                            value="<?= e($datos['nombres']) ?>"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="apellidos">
+                            Apellidos *
+                        </label>
+
+                        <input
+                            type="text"
+                            id="apellidos"
+                            name="apellidos"
+                            value="<?= e($datos['apellidos']) ?>"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="identificacion">
+                            Identificación *
+                        </label>
+
+                        <input
+                            type="text"
+                            id="identificacion"
+                            name="identificacion"
+                            value="<?= e($datos['identificacion']) ?>"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="fecha_nacimiento">
+                            Fecha de nacimiento *
+                        </label>
+
+                        <input
+                            type="date"
+                            id="fecha_nacimiento"
+                            name="fecha_nacimiento"
+                            value="<?= e($datos['fecha_nacimiento']) ?>"
+                            max="<?= date('Y-m-d') ?>"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="sexo">
+                            Sexo *
+                        </label>
+
+                        <select
+                            id="sexo"
+                            name="sexo"
+                            required
+                        >
+
+                            <option value="">
+                                Seleccionar
                             </option>
 
-                        <?php endforeach; ?>
-                    </select>
+                            <?php
+
+                            $sexos = [
+                                'masculino' => 'Masculino',
+                                'femenino' => 'Femenino',
+                                'otro' => 'Otro',
+                                'prefiero_no_decir' => 'Prefiero no decir'
+                            ];
+
+                            ?>
+
+                            <?php foreach ($sexos as $valor => $etiqueta): ?>
+
+                                <option
+                                    value="<?= e($valor) ?>"
+                                    <?= $datos['sexo'] === $valor ? 'selected' : '' ?>
+                                >
+
+                                    <?= e($etiqueta) ?>
+
+                                </option>
+
+                            <?php endforeach; ?>
+
+                        </select>
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="estado">
+                            Estado del paciente *
+                        </label>
+
+                        <select
+                            id="estado"
+                            name="estado"
+                            required
+                        >
+
+                            <option
+                                value="activo"
+                                <?= $datos['estado'] === 'activo' ? 'selected' : '' ?>
+                            >
+                                Activo
+                            </option>
+
+                            <option
+                                value="inactivo"
+                                <?= $datos['estado'] === 'inactivo' ? 'selected' : '' ?>
+                            >
+                                Inactivo
+                            </option>
+
+                        </select>
+
+                    </div>
+
                 </div>
 
-                <div class="form-group">
-                    <label>Estado del paciente *</label>
+            </section>
 
-                    <select name="estado" required>
-                        <option value="activo"
-                            <?= $datos['estado'] === 'activo' ? 'selected' : '' ?>>
-                            Activo
-                        </option>
+            <!-- INFORMACIÓN DE CONTACTO -->
 
-                        <option value="inactivo"
-                            <?= $datos['estado'] === 'inactivo' ? 'selected' : '' ?>>
-                            Inactivo
-                        </option>
-                    </select>
+            <section class="form-section">
+
+                <h2>02. Información de contacto</h2>
+
+                <p>
+                    Medios de contacto y ubicación del paciente.
+                </p>
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label for="telefono">
+                            Teléfono *
+                        </label>
+
+                        <input
+                            type="tel"
+                            id="telefono"
+                            name="telefono"
+                            value="<?= e($datos['telefono']) ?>"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="correo">
+                            Correo electrónico
+                        </label>
+
+                        <input
+                            type="email"
+                            id="correo"
+                            name="correo"
+                            value="<?= e($datos['correo']) ?>"
+                        >
+
+                    </div>
+
+                    <div class="form-group full-width">
+
+                        <label for="direccion">
+                            Dirección *
+                        </label>
+
+                        <textarea
+                            id="direccion"
+                            name="direccion"
+                            rows="3"
+                            required
+                        ><?= e($datos['direccion']) ?></textarea>
+
+                    </div>
+
                 </div>
+
+            </section>
+
+            <!-- CONTACTO DE EMERGENCIA -->
+
+            <section class="form-section">
+
+                <h2>03. Contacto de emergencia</h2>
+
+                <p>
+                    Persona a contactar en caso de emergencia.
+                </p>
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label for="contacto_emergencia">
+                            Nombre del contacto
+                        </label>
+
+                        <input
+                            type="text"
+                            id="contacto_emergencia"
+                            name="contacto_emergencia"
+                            value="<?= e($datos['contacto_emergencia']) ?>"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="telefono_emergencia">
+                            Teléfono de emergencia
+                        </label>
+
+                        <input
+                            type="tel"
+                            id="telefono_emergencia"
+                            name="telefono_emergencia"
+                            value="<?= e($datos['telefono_emergencia']) ?>"
+                        >
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- BOTONES -->
+
+            <div class="form-actions">
+
+                <a
+                    href="ver.php?id=<?= (int) $id ?>"
+                    class="btn-cancel"
+                >
+                    Cancelar
+                </a>
+
+                <button
+                    type="submit"
+                    class="btn-primary"
+                >
+                    Guardar cambios
+                </button>
 
             </div>
 
-        </section>
+        </form>
 
-        <section class="form-section">
+    </div>
 
-            <h2>02. Información de contacto</h2>
-            <p>Medios de contacto y ubicación del paciente.</p>
-
-            <div class="form-grid">
-
-                <div class="form-group">
-                    <label>Teléfono *</label>
-                    <input type="tel" name="telefono"
-                        value="<?= e($datos['telefono']) ?>" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Correo electrónico</label>
-                    <input type="email" name="correo"
-                        value="<?= e($datos['correo']) ?>">
-                </div>
-
-                <div class="form-group full-width">
-                    <label>Dirección *</label>
-                    <textarea name="direccion" rows="3"
-                        required><?= e($datos['direccion']) ?></textarea>
-                </div>
-
-            </div>
-
-        </section>
-
-        <section class="form-section">
-
-            <h2>03. Contacto de emergencia</h2>
-            <p>Persona a contactar en caso de emergencia.</p>
-
-            <div class="form-grid">
-
-                <div class="form-group">
-                    <label>Nombre del contacto</label>
-                    <input type="text" name="contacto_emergencia"
-                        value="<?= e($datos['contacto_emergencia']) ?>">
-                </div>
-
-                <div class="form-group">
-                    <label>Teléfono de emergencia</label>
-                    <input type="tel" name="telefono_emergencia"
-                        value="<?= e($datos['telefono_emergencia']) ?>">
-                </div>
-
-            </div>
-
-        </section>
-
-        <div class="form-actions">
-
-            <a href="ver.php?id=<?= $id ?>" class="btn-cancel">
-                Cancelar
-            </a>
-
-            <button type="submit" class="btn-primary">
-                Guardar cambios
-            </button>
-
-        </div>
-
-    </form>
-
-</div>
-
-</body>
-</html>
+<?php require_once __DIR__ . '/../../includes/footer.php'; ?>

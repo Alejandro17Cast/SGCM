@@ -1,28 +1,44 @@
 <?php
 session_start();
 
+// Verificar sesión
 if (!isset($_SESSION['usuario'])) {
     header('Location: ../../index.php');
     exit;
 }
 
+// Verificar permisos
 if ($_SESSION['usuario']['rol'] !== 'administrador') {
     header('Location: ../../dashboard/index.php');
     exit;
 }
 
+// Conexión a la base de datos
 require_once __DIR__ . '/../../config/database.php';
+
+// Configuración del layout
+$tituloPagina = 'Gestión de pacientes | SGCM';
+$paginaActiva = 'pacientes';
+
+// Función para escapar datos
+function e($valor) {
+    return htmlspecialchars((string) $valor, ENT_QUOTES, 'UTF-8');
+}
 
 // Parámetros de búsqueda
 $busqueda = trim($_GET['q'] ?? '');
 $estado = $_GET['estado'] ?? 'todos';
 
-// Paginación
+// Validar estado
+if (!in_array($estado, ['todos', 'activo', 'inactivo'], true)) {
+    $estado = 'todos';
+}
+
+// Configuración de paginación
 $porPagina = 10;
 $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
-$inicio = ($pagina - 1) * $porPagina;
 
-// Construir condiciones
+// Construir condiciones SQL
 $condiciones = [];
 $parametros = [];
 
@@ -34,7 +50,7 @@ if ($busqueda !== '') {
         OR telefono LIKE :busqueda4
     )";
 
-    $termino = "%$busqueda%";
+    $termino = "%{$busqueda}%";
 
     $parametros['busqueda1'] = $termino;
     $parametros['busqueda2'] = $termino;
@@ -42,7 +58,7 @@ if ($busqueda !== '') {
     $parametros['busqueda4'] = $termino;
 }
 
-if (in_array($estado, ['activo', 'inactivo'], true)) {
+if ($estado !== 'todos') {
     $condiciones[] = "estado = :estado";
     $parametros['estado'] = $estado;
 }
@@ -51,237 +67,312 @@ $where = $condiciones
     ? 'WHERE ' . implode(' AND ', $condiciones)
     : '';
 
-// Total de pacientes
+// Contar pacientes según filtros
 $sqlTotal = "SELECT COUNT(*) FROM pacientes $where";
+
 $stmtTotal = $pdo->prepare($sqlTotal);
 $stmtTotal->execute($parametros);
 
 $totalPacientes = (int) $stmtTotal->fetchColumn();
+
+// Calcular paginación
 $totalPaginas = max(1, (int) ceil($totalPacientes / $porPagina));
 
 if ($pagina > $totalPaginas) {
     $pagina = $totalPaginas;
-    $inicio = ($pagina - 1) * $porPagina;
 }
+
+$inicio = ($pagina - 1) * $porPagina;
 
 // Obtener pacientes
-$sql = "SELECT *
-        FROM pacientes
-        $where
-        ORDER BY creado_en DESC
-        LIMIT $porPagina OFFSET $inicio";
+$sql = "
+    SELECT *
+    FROM pacientes
+    $where
+    ORDER BY creado_en DESC
+    LIMIT :limite OFFSET :inicio
+";
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute($parametros);
-$pacientes = $stmt->fetchAll();
 
-// Estadísticas
-$totalActivos = (int) $pdo->query(
-    "SELECT COUNT(*) FROM pacientes WHERE estado = 'activo'"
-)->fetchColumn();
-
-$totalInactivos = (int) $pdo->query(
-    "SELECT COUNT(*) FROM pacientes WHERE estado = 'inactivo'"
-)->fetchColumn();
-
-function e($valor) {
-    return htmlspecialchars((string) $valor, ENT_QUOTES, 'UTF-8');
+// Vincular parámetros de búsqueda
+foreach ($parametros as $nombre => $valor) {
+    $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_STR);
 }
+
+$stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+$stmt->bindValue(':inicio', $inicio, PDO::PARAM_INT);
+
+$stmt->execute();
+
+$pacientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Estadísticas generales
+$totalActivos = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM pacientes
+    WHERE estado = 'activo'
+")->fetchColumn();
+
+$totalInactivos = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM pacientes
+    WHERE estado = 'inactivo'
+")->fetchColumn();
+
+// Preparar parámetros de paginación
+$parametrosUrl = [
+    'q' => $busqueda,
+    'estado' => $estado
+];
+
+// Cargar encabezado y menú lateral
+require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<main class="app-main">
 
-    <title>Pacientes | SGCM</title>
+    <?php require_once __DIR__ . '/../../includes/topbar.php'; ?>
 
-    <link rel="stylesheet" href="../../assets/css/styles.css">
-    <link rel="stylesheet" href="assets/pacientes.css">
-</head>
+    <div class="patients-page">
 
-<body>
+        <!-- Encabezado -->
+        <section class="patients-header">
 
-<div class="patients-page">
+            <div>
+                <p class="eyebrow">GESTIÓN DEL SISTEMA</p>
 
-    <header class="patients-header">
-        <div>
-            <a href="../../dashboard/index.php" class="back-link">
-                ← Volver al panel
-            </a>
+                <h1>Gestión de pacientes</h1>
 
-            <p class="eyebrow">GESTIÓN DEL SISTEMA</p>
-            <h1>Pacientes</h1>
-            <p class="subtitle">
-                Administra y consulta la información de los pacientes registrados.
-            </p>
-        </div>
-
-        <a href="crear.php" class="btn-primary">
-            + Registrar paciente
-        </a>
-    </header>
-
-    <section class="patients-stats">
-
-        <article class="stat-card">
-            <span>Total de pacientes</span>
-            <strong><?= $totalPacientes ?></strong>
-            <small>Resultados de esta búsqueda</small>
-        </article>
-
-        <article class="stat-card">
-            <span>Pacientes activos</span>
-            <strong><?= $totalActivos ?></strong>
-            <small>Registros habilitados</small>
-        </article>
-
-        <article class="stat-card">
-            <span>Pacientes inactivos</span>
-            <strong><?= $totalInactivos ?></strong>
-            <small>Registros deshabilitados</small>
-        </article>
-
-    </section>
-
-    <section class="patients-content">
-
-        <form method="GET" class="filters">
-
-            <div class="search-box">
-                <input
-                    type="text"
-                    name="q"
-                    placeholder="Buscar por nombre, identificación o teléfono..."
-                    value="<?= e($busqueda) ?>"
-                >
+                <p class="subtitle">
+                    Administra y consulta la información de los pacientes registrados.
+                </p>
             </div>
 
-            <select name="estado">
-                <option value="todos" <?= $estado === 'todos' ? 'selected' : '' ?>>
-                    Todos los estados
-                </option>
-
-                <option value="activo" <?= $estado === 'activo' ? 'selected' : '' ?>>
-                    Activos
-                </option>
-
-                <option value="inactivo" <?= $estado === 'inactivo' ? 'selected' : '' ?>>
-                    Inactivos
-                </option>
-            </select>
-
-            <button type="submit" class="btn-filter">
-                Buscar
-            </button>
-
-            <a href="index.php" class="btn-clear">
-                Limpiar
+            <a href="crear.php" class="btn-primary">
+                + Registrar paciente
             </a>
 
-        </form>
+        </section>
 
-        <div class="table-container">
+        <!-- Estadísticas -->
+        <section class="patients-stats">
 
-            <table class="patients-table">
+            <article class="stat-card">
+                <span>Total de pacientes</span>
 
-                <thead>
-                    <tr>
-                        <th>Paciente</th>
-                        <th>Identificación</th>
-                        <th>Teléfono</th>
-                        <th>Correo</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
+                <strong><?= $totalPacientes ?></strong>
 
-                <tbody>
+                <small>Resultados de esta búsqueda</small>
+            </article>
 
-                <?php if (count($pacientes) > 0): ?>
+            <article class="stat-card">
+                <span>Pacientes activos</span>
 
-                    <?php foreach ($pacientes as $paciente): ?>
+                <strong><?= $totalActivos ?></strong>
+
+                <small>Registros habilitados</small>
+            </article>
+
+            <article class="stat-card">
+                <span>Pacientes inactivos</span>
+
+                <strong><?= $totalInactivos ?></strong>
+
+                <small>Registros deshabilitados</small>
+            </article>
+
+        </section>
+
+        <!-- Contenido principal -->
+        <section class="patients-content">
+
+            <div class="section-heading">
+                <div>
+                    <h2>Listado de pacientes</h2>
+
+                    <p>
+                        Consulta, busca y administra los registros.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Buscador y filtros -->
+            <form method="GET" class="filters">
+
+                <div class="search-box">
+                    <input
+                        type="text"
+                        name="q"
+                        placeholder="Buscar por nombre, identificación o teléfono..."
+                        value="<?= e($busqueda) ?>"
+                    >
+                </div>
+
+                <select name="estado">
+
+                    <option value="todos"
+                        <?= $estado === 'todos' ? 'selected' : '' ?>>
+                        Todos los estados
+                    </option>
+
+                    <option value="activo"
+                        <?= $estado === 'activo' ? 'selected' : '' ?>>
+                        Activos
+                    </option>
+
+                    <option value="inactivo"
+                        <?= $estado === 'inactivo' ? 'selected' : '' ?>>
+                        Inactivos
+                    </option>
+
+                </select>
+
+                <button type="submit" class="btn-filter">
+                    Buscar
+                </button>
+
+                <a href="index.php" class="btn-clear">
+                    Limpiar
+                </a>
+
+            </form>
+
+            <!-- Tabla -->
+            <div class="table-container">
+
+                <table class="patients-table">
+
+                    <thead>
+                        <tr>
+                            <th>Paciente</th>
+                            <th>Identificación</th>
+                            <th>Teléfono</th>
+                            <th>Correo</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                    <?php if (!empty($pacientes)): ?>
+
+                        <?php foreach ($pacientes as $paciente): ?>
+
+                            <tr>
+
+                                <td>
+                                    <div class="patient-name">
+                                        <?= e(
+                                            $paciente['nombres'] . ' ' .
+                                            $paciente['apellidos']
+                                        ) ?>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <?= e($paciente['identificacion']) ?>
+                                </td>
+
+                                <td>
+                                    <?= e($paciente['telefono'] ?: 'No registrado') ?>
+                                </td>
+
+                                <td>
+                                    <?= e($paciente['correo'] ?: 'No registrado') ?>
+                                </td>
+
+                                <td>
+                                    <span class="status <?= e($paciente['estado']) ?>">
+                                        <?= ucfirst(e($paciente['estado'])) ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="actions">
+
+                                        <a href="ver.php?id=<?= (int) $paciente['id'] ?>">
+                                            Ver
+                                        </a>
+
+                                        <a href="editar.php?id=<?= (int) $paciente['id'] ?>">
+                                            Editar
+                                        </a>
+
+                                    </div>
+                                </td>
+
+                            </tr>
+
+                        <?php endforeach; ?>
+
+                    <?php else: ?>
 
                         <tr>
-                            <td>
-                                <div class="patient-name">
-                                    <?= e($paciente['nombres'] . ' ' . $paciente['apellidos']) ?>
-                                </div>
-                            </td>
-
-                            <td><?= e($paciente['identificacion']) ?></td>
-
-                            <td><?= e($paciente['telefono']) ?></td>
-
-                            <td><?= e($paciente['correo'] ?: 'No registrado') ?></td>
-
-                            <td>
-                                <span class="status <?= e($paciente['estado']) ?>">
-                                    <?= ucfirst(e($paciente['estado'])) ?>
-                                </span>
-                            </td>
-
-                            <td>
-                                <div class="actions">
-                                    <a href="ver.php?id=<?= (int) $paciente['id'] ?>">
-                                        Ver
-                                    </a>
-
-                                    <a href="editar.php?id=<?= (int) $paciente['id'] ?>">
-                                        Editar
-                                    </a>
-                                </div>
+                            <td colspan="6" class="empty-state">
+                                No se encontraron pacientes registrados.
                             </td>
                         </tr>
 
-                    <?php endforeach; ?>
+                    <?php endif; ?>
 
-                <?php else: ?>
+                    </tbody>
 
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            No se encontraron pacientes registrados.
-                        </td>
-                    </tr>
-
-                <?php endif; ?>
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-        <div class="table-footer">
-            <span>
-                Mostrando <?= count($pacientes) ?> de <?= $totalPacientes ?> pacientes
-            </span>
-
-            <div class="pagination">
-
-                <?php if ($pagina > 1): ?>
-                    <a href="?q=<?= urlencode($busqueda) ?>&estado=<?= urlencode($estado) ?>&pagina=<?= $pagina - 1 ?>">
-                        Anterior
-                    </a>
-                <?php endif; ?>
-
-                <span>
-                    Página <?= $pagina ?> de <?= $totalPaginas ?>
-                </span>
-
-                <?php if ($pagina < $totalPaginas): ?>
-                    <a href="?q=<?= urlencode($busqueda) ?>&estado=<?= urlencode($estado) ?>&pagina=<?= $pagina + 1 ?>">
-                        Siguiente
-                    </a>
-                <?php endif; ?>
+                </table>
 
             </div>
-        </div>
 
-    </section>
+            <!-- Pie de tabla y paginación -->
+            <div class="table-footer">
 
-</div>
+                <span>
+                    Mostrando <?= count($pacientes) ?>
+                    de <?= $totalPacientes ?> pacientes
+                </span>
 
-</body>
-</html>
+                <div class="pagination">
+
+                    <?php if ($pagina > 1): ?>
+
+                        <a href="?<?= e(http_build_query(
+                            array_merge($parametrosUrl, [
+                                'pagina' => $pagina - 1
+                            ])
+                        )) ?>">
+                            Anterior
+                        </a>
+
+                    <?php endif; ?>
+
+                    <span>
+                        Página <?= $pagina ?> de <?= $totalPaginas ?>
+                    </span>
+
+                    <?php if ($pagina < $totalPaginas): ?>
+
+                        <a href="?<?= e(http_build_query(
+                            array_merge($parametrosUrl, [
+                                'pagina' => $pagina + 1
+                            ])
+                        )) ?>">
+                            Siguiente
+                        </a>
+
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</main>
+
+<?php
+// Cargar pie de página
+require_once __DIR__ . '/../../includes/footer.php';
+?>
